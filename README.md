@@ -7,5 +7,6 @@ run the commands
 make
 ./mtprimes -b <block> -l <limit> -t <num_threads>
 ```
-block - the block each thread is searching through (e.g., one thread does 0..49, another 50..99, etc.)
-limit - number of primes to be found
+block - the block each thread is searching through (e.g., one thread does 0..49, another 50..99, etc.)<br />
+limit - number of primes to be found <br />
+num_threads - number of threads fiding primes at the same time<br />
