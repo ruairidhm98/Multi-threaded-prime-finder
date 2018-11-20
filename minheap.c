@@ -55,17 +55,19 @@ MinHeap *min_heap_create(int capacity) {
     mh -> capacity = capacity;
     mh -> size = 0;
     mh -> elements = (int *) malloc(sizeof(int) * capacity);
+    if (!mh->elements) {
+        fprintf(stderr, "Error: memory allocation failed\n");
+        free((void *) mh);
+        mh = NULL;
+    }
     if (pthread_mutex_init(&mh -> mutex, NULL)) {
         fprintf(stderr, "Error: failed to create mutex\n");
-        free(mh);
+        free((void *) mh);
+        free((void *) mh -> elements);
         mh = NULL;
         return mh;
     }
-    if (!mh -> elements) {
-        fprintf(stderr, "Error: memory allocation failed\n");
-        free(mh);
-        mh = NULL;
-    }
+    
 
     return mh;
 }
@@ -74,14 +76,15 @@ MinHeap *min_heap_create(int capacity) {
 int min_heap_delete_root(MinHeap *heap) {
 
     int root;
+    /* Critical region */
+    pthread_mutex_lock(&heap->mutex);
     /* Check if heap if empty first, print error message and return -1 if so */
     if (heap -> size == 0) {
-        fputs("Error: heap is empty.\n", stderr);
+        fprintf(stderr, "Error: heap is empty\n", stderr);
         return -1;
     }
     root = heap -> elements[0];
-    /* Critical region */
-    pthread_mutex_lock(&heap -> mutex);
+
     heap -> elements[0] = heap -> elements[--heap -> size];
     heapify_down(heap);
     pthread_mutex_unlock(&heap -> mutex);
@@ -92,12 +95,12 @@ int min_heap_delete_root(MinHeap *heap) {
 /* Inserts data into Min Heap */
 int min_heap_insert(MinHeap *heap, int data) {
 
+    pthread_mutex_lock(&heap->mutex);
     /* Print error message and return from function if heap is full */
     if (heap -> size == heap -> capacity) {
         fprintf(stderr, "Error: heap is full!\n");
         return 1;
     }
-    pthread_mutex_lock(&heap -> mutex);
     /* Insert data */
     heap -> elements[heap -> size++] = data;
     /* Impose heap property */
@@ -110,15 +113,17 @@ int min_heap_insert(MinHeap *heap, int data) {
 /* Prints the min heap */
 void print_min_heap(MinHeap *mh) {
     int i;
+    pthread_mutex_lock(&mh -> mutex);
     for (i = 0; i < mh -> size; i++) printf("%d ", mh -> elements[i]);
+    pthread_mutex_unlock(&mh -> mutex);
     printf("\n");
 }
 
 /* Destorys a min heap object */
 void min_heap_destroy(MinHeap *mh) {
-    free(mh);
-    free(mh -> elements);
-    pthread_mutex_destroy(&mh->mutex);
+    free((void *) mh);
+    free((void *) mh -> elements);
+    pthread_mutex_destroy(&mh -> mutex);
     mh = NULL;
 }
 

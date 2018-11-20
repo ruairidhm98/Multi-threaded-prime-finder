@@ -63,7 +63,7 @@ void print_sorted(MinHeap *mh, int limit) {
 
 int main(int argc, char **argv) {
 
-    pthread_t collectorThread, **generatorThreads;
+    pthread_t collectorThread, *generatorThreads;
     unsigned long block, limit, temp, msec;
     struct timeval start, stop;
     double msperprime;
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     BoundedBuffer *bb;
     Args_t *args1;
     MinHeap *mh;
-    Args **args;
+    Args *args;
     
     block = 1;
     limit = 100;
@@ -102,29 +102,41 @@ int main(int argc, char **argv) {
 
     /* Create min heap object */
     mh = min_heap_create(limit);
-    if (!mh) return -1;
+    if (!mh) {
+        bb_destroy(bb);
+        return -1;
+    } 
 
     /* Create generator threads */
-    generatorThreads = (pthread_t **) malloc(sizeof(pthread_t *) * nthread);
-    for (i = 0; i < nthread; i++) 
-        generatorThreads[i] = (pthread_t *) malloc(sizeof(pthread_t));
-
+    generatorThreads = (pthread_t *) malloc(sizeof(pthread_t) * nthread);
+    if (!generatorThreads) {
+        min_heap_destroy(mh);
+        bb_destroy(bb);
+        free((void *) generatorThreads);
+        return -1;
+    }
     /* Create argument array */
-    args = (Args **) malloc(sizeof(Args *) * nthread);
+    args = (Args *) malloc(sizeof(Args) * nthread);
     if (!args) return -1;
     temp = 0;
     for (i = 0; i < nthread; i++) {
-        args[i] = (Args *) malloc(sizeof(Args));
-        args[i] -> bb = bb;
-        args[i] -> start = temp;
+        args[i].bb = bb;
+        args[i].start = temp;
         temp += block;
-        args[i] -> end = temp - 1;
-        args[i] -> limit = limit;
+        args[i].end = temp - 1;
+        args[i].limit = limit;
     }
     
     /* Create arguments for print_primes */
     args1 = (Args_t *) malloc(sizeof(Args_t));
-    if (!args1) return -1;
+    if (!args1) {
+        min_heap_destroy(mh);
+        bb_destroy(bb);
+        free((void *) generatorThreads);
+        free((void *) args);
+        free((void *) args1);
+        return -1;
+    }
     args1 -> bb = bb;
     args1 -> limit = limit;
     args1 -> mh = mh;
@@ -134,22 +146,32 @@ int main(int argc, char **argv) {
     /* Check if collector thread was spawned successfully */
     if (pthread_create(&collectorThread, NULL, print_primes, (void *) args1)) {
         fprintf(stderr, "Error: collector thread failed to create\n");
+        min_heap_destroy(mh);
+        bb_destroy(bb);
+        free((void *) generatorThreads);
+        free((void *) args);
+        free((void *) args1);
         return -1;
     }
     while (bb_get_size(bb) != limit) {
         /* Start all generator threads */
         for (i = 0; i < nthread; i++) 
             /* Check if each generator thread spawned succesfully */
-            if (pthread_create(generatorThreads[i], NULL, search_region, (void *) args[i])) {
+            if (pthread_create(&generatorThreads[i], NULL, search_region, (void *) &args[i])) {
                 fprintf(stderr, "Error: generator thread %d failed to create\n", i);
+                min_heap_destroy(mh);
+                bb_destroy(bb);
+                free((void *) generatorThreads);
+                free((void *) args);
+                free((void *) args1);
                 return -1;
             }
         /* Wait for generators to finish */
-        for (i = 0; i < nthread; i++) pthread_join(*generatorThreads[i], NULL);
+        for (i = 0; i < nthread; i++) pthread_join(generatorThreads[i], NULL);
         /* Set the new intervals */
         for (i = 0; i < nthread; i++) {  
-            args[i] -> start += nthread * block;
-            args[i] -> end += nthread * block;
+            args[i].start += nthread * block;
+            args[i].end += nthread * block;
         }
         
     }
@@ -170,10 +192,10 @@ int main(int argc, char **argv) {
                     limit, msec/1000, msec%1000, msperprime);
     
     /* Free heap memory */
-    for (i = 0; i < nthread; i++) free(args[i]);
-    free(args);
-    free(args1);
+    free((void *) args);
+    free((void *) args1);
     bb_destroy(bb);
-
+    min_heap_destroy(mh);
+    
     return 0;
 }
