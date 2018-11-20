@@ -76,10 +76,9 @@ int bb_insert(BoundedBuffer *bb, uint32_t num) {
     /* Critical region */
     pthread_mutex_lock(&bb -> mutex);
     /* Bounded buffer is full, or all elements currently being printed */
-    while (bb -> size == bb -> capacity) {
-        printf("== Buffer is full ==\n");
+    while (bb -> size == bb -> capacity) 
         pthread_cond_wait(&bb -> insert, &bb -> mutex);
-    }
+    
     
     bb -> elements[bb -> start] = num;
     bb -> start = (bb -> start + 1) % bb -> capacity;
@@ -98,16 +97,14 @@ int bb_remove(BoundedBuffer *bb) {
 
     pthread_mutex_lock(&bb -> mutex);
     /* Buffer is empty */
-    while (bb -> size == 0) { 
-        printf("== Buffer is empty ==\n");
+    while (!bb -> size) 
         pthread_cond_wait(&bb -> delete, &bb -> mutex);
-    }
-    if (bb -> size != 0) {
-        bb -> end = (bb -> end + 1) % bb -> capacity;
-        item = bb -> elements[bb -> end];
-        bb -> size--;
-    } 
-    else;
+    
+   
+    bb -> end = (bb -> end + 1) % bb -> capacity;
+    item = bb -> elements[bb -> end];
+    bb -> size--;
+    
     pthread_mutex_unlock(&bb -> mutex);
     pthread_cond_signal(&bb -> insert);
 

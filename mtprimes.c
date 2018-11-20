@@ -13,6 +13,7 @@
 typedef struct args_1 {
     int end;
     int start;
+    int block_gap;
     BoundedBuffer *bb;
     unsigned long limit;
 } Args;
@@ -27,18 +28,24 @@ typedef struct args_2 {
 /* Finds all primes in a particular region */
 void *search_region(void *arg) {
 
-    unsigned long i;
+    unsigned long i, n;
     Args *args;
     
     args = (Args *) arg;
+    n = 0;
     /* Search for primes in given range */
-    for (i = args -> start; i <= args -> end; i++) 
+    for (i = args -> start; bb_get_size(args -> bb) != args -> limit; i++) {
+        if (n++ == args -> end - 1) {
+            n = 0;
+            i += args -> block_gap * (args -> end - args -> start);
+        }
         if (is_prime(i)) {
-            if (bb_get_size(args -> bb) != args -> limit) 
+            if (bb_get_size(args -> bb) < args -> limit)
                 bb_insert(args -> bb, i);
             else break;
         }
-                
+    }
+                     
     pthread_exit((void *) 0);
 }
 
@@ -125,6 +132,7 @@ int main(int argc, char **argv) {
         temp += block;
         args[i].end = temp - 1;
         args[i].limit = limit;
+        args[i].block_gap = nthread;
     }
     
     /* Create arguments for print_primes */
@@ -153,29 +161,23 @@ int main(int argc, char **argv) {
         free((void *) args1);
         return -1;
     }
-    while (bb_get_size(bb) != limit) {
-        /* Start all generator threads */
-        for (i = 0; i < nthread; i++) 
-            /* Check if each generator thread spawned succesfully */
-            if (pthread_create(&generatorThreads[i], NULL, search_region, (void *) &args[i])) {
-                fprintf(stderr, "Error: generator thread %d failed to create\n", i);
-                min_heap_destroy(mh);
-                bb_destroy(bb);
-                free((void *) generatorThreads);
-                free((void *) args);
-                free((void *) args1);
-                return -1;
-            }
-        /* Wait for generators to finish */
-        for (i = 0; i < nthread; i++) pthread_join(generatorThreads[i], NULL);
-        /* Set the new intervals */
-        for (i = 0; i < nthread; i++) {  
-            args[i].start += nthread * block;
-            args[i].end += nthread * block;
+
+    /* Start all generator threads */
+    for (i = 0; i < nthread; i++) 
+        /* Check if each generator thread spawned succesfully */
+        if (pthread_create(&generatorThreads[i], NULL, search_region, (void *) &args[i])) {
+            fprintf(stderr, "Error: generator thread %d failed to create\n", i);
+            min_heap_destroy(mh);
+            bb_destroy(bb);
+            free((void *) generatorThreads);
+            free((void *) args);
+            free((void *) args1);
+            return -1;
         }
         
-    }
-    
+    /* Wait for generators to finish */
+    for (i = 0; i < nthread; i++) pthread_join(generatorThreads[i], NULL);
+
     /* Wait for collector thread to finish */
     pthread_join(collectorThread, NULL); 
     /* End timer */
