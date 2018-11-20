@@ -72,8 +72,7 @@ int main(int argc, char **argv) {
 
     pthread_t collectorThread, *generatorThreads;
     unsigned long block, limit, temp, msec;
-    struct timeval start, stop;
-    double msperprime;
+    double msperprime, t1, t2;
     int i, j, nthread;
     BoundedBuffer *bb;
     Args_t *args1;
@@ -149,8 +148,7 @@ int main(int argc, char **argv) {
     args1 -> limit = limit;
     args1 -> mh = mh;
 
-    /* Start timer */
-    gettimeofday(&start, NULL);
+    t1 = clock();
     /* Check if collector thread was spawned successfully */
     if (pthread_create(&collectorThread, NULL, print_primes, (void *) args1)) {
         fprintf(stderr, "Error: collector thread failed to create\n");
@@ -180,19 +178,11 @@ int main(int argc, char **argv) {
 
     /* Wait for collector thread to finish */
     pthread_join(collectorThread, NULL); 
-    /* End timer */
-    gettimeofday(&stop, NULL);
+    t2 = clock();
     /* Print primes in sorted order */
     print_sorted(mh, limit);
-    if (stop.tv_usec < start.tv_usec) {
-        stop.tv_usec += 1000000;
-        stop.tv_sec--;
-    }
-    msec = (1000 * (stop.tv_sec - start.tv_sec) + (stop.tv_usec - start.tv_usec) / 1000) / (double) nthread;
-    msperprime = (double) msec / (double) limit / (double) nthread;
-    fprintf(stderr, "%lu primes computed in %lu.%04lu seconds, %.3f ms/prime\n",
-                    limit, msec/1000, msec%1000, msperprime);
-    
+    fprintf(stderr, "%lu primes computed in %.4f seconds, %.4f ms/prime\n", 
+            limit, (t2-t1)/CLOCKS_PER_SEC/nthread, 1000 * ((t2-t1)/CLOCKS_PER_SEC)/limit/nthread);
     /* Free heap memory */
     free((void *) args);
     free((void *) args1);
