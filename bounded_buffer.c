@@ -5,6 +5,7 @@
 
 /* Bounded buffer implemented as a circular array */
 struct boundedbuffer {
+    uint32_t done;
     uint32_t start;
     uint32_t end;
     uint32_t size;
@@ -26,6 +27,7 @@ BoundedBuffer *bb_create(uint32_t capacity) {
         fprintf(stderr, "Error: memory allocation failed. bb_create failed\n");
         return NULL;
     }
+    bb -> done = 0;
     bb -> start = 0;
     bb -> size = 0;
     bb -> end = capacity - 1;
@@ -76,12 +78,16 @@ int bb_insert(BoundedBuffer *bb, uint32_t num) {
     /* Critical region */
     pthread_mutex_lock(&bb -> mutex);
     /* Bounded buffer is full, or all elements currently being printed */
-    while (bb -> size == bb -> capacity) 
+    while (bb -> size == bb -> capacity && !bb -> done) { 
+        printf("== Buffer is full ==\n");
         pthread_cond_wait(&bb -> insert, &bb -> mutex);  
-    
-    bb -> elements[bb -> start] = num;
-    bb -> start = (bb -> start + 1) % bb -> capacity;
-    bb -> size++;
+    }
+    /* We are not done yet */
+    if (bb -> size != bb -> capacity) {
+        bb -> elements[bb -> start] = num;
+        bb -> start = (bb -> start + 1) % bb -> capacity;
+        bb -> size++;
+    }
     pthread_mutex_unlock(&bb -> mutex);
     pthread_cond_signal(&bb -> delete);
 
@@ -96,13 +102,15 @@ int bb_remove(BoundedBuffer *bb) {
 
     pthread_mutex_lock(&bb -> mutex);
     /* Buffer is empty */
-    while (!bb -> size) 
+    while (!bb -> size && !bb -> done) {
+        printf("== Buffer is empty ==\n");
         pthread_cond_wait(&bb -> delete, &bb -> mutex);
-    
-    bb -> end = (bb -> end + 1) % bb -> capacity;
-    item = bb -> elements[bb -> end];
-    bb -> size--;
-    
+    }
+    if (!bb -> done && bb -> size) {
+        bb -> end = (bb -> end + 1) % bb -> capacity;
+        item = bb -> elements[bb -> end];
+        bb -> size--; 
+    }
     pthread_mutex_unlock(&bb -> mutex);
     pthread_cond_signal(&bb -> insert);
 
@@ -115,11 +123,16 @@ void bb_print(BoundedBuffer *bb) {
     for (i = 0; i < bb -> size; i++) printf("%d\n", bb -> elements[i]);
 }
 
-/* Returns the mutex of the bounded buffer */
-pthread_mutex_t *bb_get_mutex(BoundedBuffer *bb) { return &bb -> mutex; }
-
 /* Returns the size of the bounded buffer */
-int bb_get_size(BoundedBuffer *bb) { return bb ? bb -> size : -1;}
+int bb_get_size(BoundedBuffer *bb) { 
+    
+    int result;
+
+    pthread_mutex_lock(&bb -> mutex);
+    result = bb ? bb -> size : -1;
+    pthread_mutex_unlock(&bb -> mutex);
+    return result;
+}
 
 /* Destroys bounded buffer */
 void bb_destroy(BoundedBuffer *bb) {
@@ -128,4 +141,11 @@ void bb_destroy(BoundedBuffer *bb) {
     pthread_mutex_destroy(&bb -> mutex);
     pthread_cond_destroy(&bb -> insert);
     pthread_cond_destroy(&bb -> delete);
+}
+
+/* Set done to true, used to help thread synch */
+void set_done(BoundedBuffer *bb) {
+    bb -> done = 1;
+    pthread_cond_broadcast(&bb -> insert);
+    pthread_cond_broadcast(&bb -> delete);
 }

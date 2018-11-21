@@ -9,6 +9,8 @@
 #include "minheap.h"
 #include "bounded_buffer.h"
 
+static int primesFound = 0;
+
 /* Parameters passed to search_region function */
 typedef struct args_1 {
     int end;
@@ -34,15 +36,17 @@ void *search_region(void *arg) {
     args = (Args *) arg;
     n = 0;
     /* Search for primes in given range */
-    for (i = args -> start; bb_get_size(args -> bb) != args -> limit; i++) {
-        if (n++ == args -> end - 1) {
+    for (i = args -> start; primesFound < args -> limit; i++) {
+        if (n++ == args -> end) {
             n = 0;
             i += args -> block_gap * (args -> end - args -> start);
         }
         if (is_prime(i)) {
-            if (bb_get_size(args -> bb) < args -> limit)
+            if (bb_get_size(args -> bb) > args -> limit) set_done(args -> bb);
+            else {
                 bb_insert(args -> bb, i);
-            else break;
+                primesFound++;
+            }
         }
     }
                      
@@ -59,6 +63,9 @@ void *print_primes(void *arg) {
     count = 0;
     while (count++ < args -> limit) 
         min_heap_insert(args -> mh, bb_remove(args -> bb));
+    
+    /* Notify other threads we are done */
+    set_done(args -> bb);
     
     pthread_exit((void *) 0);
  }
@@ -123,13 +130,16 @@ int main(int argc, char **argv) {
     }
     /* Create argument array */
     args = (Args *) malloc(sizeof(Args) * nthread);
-    if (!args) return -1;
+    if (!args) {
+        free((void *) args);
+        return -1;
+    }
     temp = 0;
     for (i = 0; i < nthread; i++) {
         args[i].bb = bb;
         args[i].start = temp;
         temp += block;
-        args[i].end = temp - 1;
+        args[i].end = temp;
         args[i].limit = limit;
         args[i].block_gap = nthread;
     }
