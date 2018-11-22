@@ -37,12 +37,14 @@ void *search_region(void *arg) {
     n = 0;
     /* Search for primes in given range */
     for (i = args -> start; primesFound < args -> limit; i++) {
-        if (n++ == args -> end) {
+        if (n++ == (1 + args -> end - args -> start)) {
             n = 0;
             i += args -> block_gap * (args -> end - args -> start);
         }
         if (is_prime(i)) {
-            if (bb_get_size(args -> bb) > args -> limit) set_done(args -> bb);
+            /* Notify other threads we are finished */
+            if (primesFound > args -> limit) break;
+            /* Insert into bounded buffer */
             else {
                 bb_insert(args -> bb, i);
                 primesFound++;
@@ -65,7 +67,7 @@ void *print_primes(void *arg) {
         min_heap_insert(args -> mh, bb_remove(args -> bb));
     
     /* Notify other threads we are done */
-    set_done(args -> bb);
+    //set_done(args -> bb);
     
     pthread_exit((void *) 0);
  }
