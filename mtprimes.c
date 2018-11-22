@@ -37,6 +37,7 @@ void *search_region(void *arg) {
     n = 0;
     /* Search for primes in given range */
     for (i = args -> start; primesFound < args -> limit; i++) {
+        /* Reached end of block */
         if (n++ == (1 + args -> end - args -> start)) {
             n = 0;
             i += args -> block_gap * (args -> end - args -> start);
