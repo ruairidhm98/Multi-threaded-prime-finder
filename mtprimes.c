@@ -10,9 +10,10 @@
 #include "bounded_buffer.h"
 
 static int primesFound = 0;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Parameters passed to search_region function */
-typedef struct args_1 {
+typedef struct args_1 {  
     int end;
     int start;
     int block_gap;
@@ -32,46 +33,49 @@ void *search_region(void *arg) {
 
     unsigned long i, n;
     Args *args;
-    
-    args = (Args *) arg;
+
+    args = (Args *)arg;
     n = 0;
     /* Search for primes in given range */
     for (i = args -> start; primesFound < args -> limit; i++) {
         /* Reached end of block */
-        if (n++ == (1 + args -> end - args -> start)) {
+        if (n++ == (1 + args->end - args->start)) {
             n = 0;
             i += args -> block_gap * (args -> end - args -> start);
         }
         if (is_prime(i)) {
             /* Notify other threads we are finished */
-            if (primesFound > args -> limit) break;
+            if (primesFound > args->limit)
+                break;
             /* Insert into bounded buffer */
             else {
                 bb_insert(args -> bb, i);
+                pthread_mutex_lock(&mutex);
                 primesFound++;
+                pthread_mutex_unlock(&mutex);
             }
         }
     }
-                     
-    pthread_exit((void *) 0);
+
+    pthread_exit((void *)0);
 }
 
 /* Prints all elements in bounded buffer */
-void *print_primes(void *arg) { 
+void *print_primes(void *arg) {
 
     Args_t *args;
     int count;
 
-    args = (Args_t *) arg;
+    args = (Args_t *)arg;
     count = 0;
-    while (count++ < args -> limit) 
+    while (count++ < args->limit)
         min_heap_insert(args -> mh, bb_remove(args -> bb));
-    
+
     /* Notify other threads we are done */
-    //set_done(args -> bb);
-    
-    pthread_exit((void *) 0);
- }
+    set_done(args -> bb);
+
+    pthread_exit((void *)0);
+}
 
 void print_sorted(MinHeap *mh, int limit) {
     int i;
@@ -88,11 +92,11 @@ int main(int argc, char **argv) {
     Args_t *args1;
     MinHeap *mh;
     Args *args;
-    
+
     block = 1;
     limit = 100;
     nthread = 1;
-    
+
     /* Process command line arguments */
     for (i = 1; i < argc;) {
         if ((j = i + 1) == argc) {
@@ -121,20 +125,20 @@ int main(int argc, char **argv) {
     if (!mh) {
         bb_destroy(bb);
         return -1;
-    } 
+    }
 
     /* Create generator threads */
-    generatorThreads = (pthread_t *) malloc(sizeof(pthread_t) * nthread);
+    generatorThreads = (pthread_t *)malloc(sizeof(pthread_t) * nthread);
     if (!generatorThreads) {
         min_heap_destroy(mh);
         bb_destroy(bb);
-        free((void *) generatorThreads);
+        free((void *)generatorThreads);
         return -1;
     }
     /* Create argument array */
-    args = (Args *) malloc(sizeof(Args) * nthread);
+    args = (Args *)malloc(sizeof(Args) * nthread);
     if (!args) {
-        free((void *) args);
+        free((void *)args);
         return -1;
     }
     temp = 0;
@@ -146,7 +150,7 @@ int main(int argc, char **argv) {
         args[i].limit = limit;
         args[i].block_gap = nthread;
     }
-    
+
     /* Create arguments for print_primes */
     args1 = (Args_t *) malloc(sizeof(Args_t));
     if (!args1) {
@@ -167,40 +171,37 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Error: collector thread failed to create\n");
         min_heap_destroy(mh);
         bb_destroy(bb);
-        free((void *) generatorThreads);
-        free((void *) args);
-        free((void *) args1);
+        free((void *)generatorThreads);
+        free((void *)args);
+        free((void *)args1);
         return -1;
     }
 
     /* Start all generator threads */
-    for (i = 0; i < nthread; i++) 
+    for (i = 0; i < nthread; i++)
         /* Check if each generator thread spawned succesfully */
         if (pthread_create(&generatorThreads[i], NULL, search_region, (void *) &args[i])) {
             fprintf(stderr, "Error: generator thread %d failed to create\n", i);
             min_heap_destroy(mh);
             bb_destroy(bb);
-            free((void *) generatorThreads);
-            free((void *) args);
-            free((void *) args1);
+            free((void *)generatorThreads);
+            free((void *)args);
+            free((void *)args1);
             return -1;
         }
-        
-    /* Wait for generators to finish */
-    for (i = 0; i < nthread; i++) pthread_join(generatorThreads[i], NULL);
 
     /* Wait for collector thread to finish */
-    pthread_join(collectorThread, NULL); 
+    pthread_join(collectorThread, NULL);
     t2 = clock();
     /* Print primes in sorted order */
     print_sorted(mh, limit);
-    fprintf(stderr, "%lu primes computed in %.4f seconds, %.4f ms/prime\n", 
-            limit, (t2-t1)/CLOCKS_PER_SEC/nthread, 1000 * ((t2-t1)/CLOCKS_PER_SEC)/limit/nthread);
+    fprintf(stderr, "%lu primes computed in %.4f seconds, %.4f ms/prime\n",
+            limit, (t2 - t1) / CLOCKS_PER_SEC / nthread, 1000 * ((t2 - t1) / CLOCKS_PER_SEC) / limit / nthread);
     /* Free heap memory */
     free((void *) args);
     free((void *) args1);
     bb_destroy(bb);
     min_heap_destroy(mh);
-    
+
     return 0;
-}
+} 

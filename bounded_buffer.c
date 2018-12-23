@@ -145,7 +145,9 @@ void bb_destroy(BoundedBuffer *bb) {
 
 /* Set done to true, used to help thread synch */
 void set_done(BoundedBuffer *bb) {
+    pthread_mutex_lock(&bb -> mutex);
     bb -> done = 1;
+    pthread_mutex_unlock(&bb -> mutex);
     pthread_cond_broadcast(&bb -> insert);
     pthread_cond_broadcast(&bb -> delete);
 }
