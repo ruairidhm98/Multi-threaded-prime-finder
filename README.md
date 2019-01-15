@@ -1,5 +1,5 @@
 # Multi-threaded-prime-finder
-Find a certain number of primes entered as one of the command line arguments concurrently using the PThreads API. The collector thread inserts the primes as it recieves them into a min-heap. The generator threads are searching for the prime numbers. A bounded buffer implemented as a monitor was used to store the primes and then remove them at the same time. The program then prints out each prime in sorted order to the stdout then terminates.
+Find a certain number of primes entered as one of the command line arguments using the PThreads API. The collector thread inserts the primes as it recieves them into a min-heap. The generator threads are searching for the prime numbers. A bounded buffer implemented as a monitor was used to store the primes and then remove them at the same time. The program then prints out each prime in sorted order to the stdout then terminates.
 
 # How to Use
 run the commands 
