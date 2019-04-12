@@ -2,14 +2,13 @@
 #define _BOUNDED_BUFFER_
 
 #include <pthread.h>
-#include <stdint.h>
 
 typedef struct boundedbuffer BoundedBuffer;
 
 /* Returns a pointer to a bounded buffer object */
-BoundedBuffer *bb_create(uint32_t capacity);
+BoundedBuffer *bb_create(uint32_t);
 /* Insert a given unsigned integer into the buffer */
-int bb_insert(BoundedBuffer *, uint32_t item);
+int bb_insert(BoundedBuffer *, uint32_t);
 /* Removes an element from the buffer */
 int bb_remove(BoundedBuffer *);
 /* Returns the size of the buffer */

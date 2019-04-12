@@ -87,8 +87,8 @@ void print_sorted(MinHeap *mh, int limit) {
 int main(int argc, char **argv) {
 
   pthread_t collectorThread, *generatorThreads;
-  unsigned long block, limit, temp;
-  double t1, t2;
+  unsigned long block, limit, temp, msec;
+  double msperprime, t1, t2;
   int i, j, nthread;
   BoundedBuffer *bb;
   Args_t *args1;
