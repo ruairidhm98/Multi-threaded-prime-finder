@@ -81,7 +81,7 @@ int bb_insert(BoundedBuffer *bb, uint32_t num) {
   /* Critical region */
   pthread_mutex_lock(&bb->mutex);
   /* Bounded buffer is full, or all elements currently being printed */
-  while (bb->size == bb->capacity && !bb->done) {
+  while ((bb->size == bb->capacity) && (!bb->done)) {
     printf("== Buffer is full ==\n");
     pthread_cond_wait(&bb->insert, &bb->mutex);
   }
