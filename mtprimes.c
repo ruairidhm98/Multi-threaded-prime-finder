@@ -45,16 +45,16 @@ void *search_region(void *arg) {
       i += args->block_gap * (args->end - args->start);
     }
     if (is_prime(i)) {
+      pthread_mutex_lock(&mutex);
       /* Notify other threads we are finished */
       if (primesFound > args->limit)
         break;
       /* Insert into bounded buffer */
       else {
         bb_insert(args->bb, i);
-        pthread_mutex_lock(&mutex);
         primesFound++;
-        pthread_mutex_unlock(&mutex);
       }
+      pthread_mutex_unlock(&mutex);
     }
   }
 
