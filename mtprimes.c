@@ -11,6 +11,7 @@
 #include <sys/time.h>
 
 static volatile sig_atomic_t primesFound = 0;
+pthread_mutex_t mutex = PTHREAD_COND_INITIALIZER;
 
 /* Parameters passed to search_region function */
 typedef struct args_1 {
@@ -50,7 +51,9 @@ void *search_region(void *arg) {
       /* Insert into bounded buffer */
       else {
         bb_insert(args->bb, i);
+        pthread_mutex_lock(&mutex);
         primesFound++;
+        pthread_mutex_unlock(&mutex);
       }
     }
   }
