@@ -1,7 +1,7 @@
 CC=clang # C compiler
 EXE=mtprimes # Exectuable file
 OBJ=bounded_buffer.o mtprimes.o isprime.o minheap.o # Object code
-CFLAGS=-Wall -Werror -g # Compiler flags
+CFLAGS=-Wall -Werror -g -pthread # Compiler flags
 # Compiles object code into executable file
 $(EXE) : $(OBJ)
 	$(CC) $(CFLAGS) $^ -o $@

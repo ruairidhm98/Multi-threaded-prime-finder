@@ -10,9 +10,9 @@
 #include <string.h>
 #include <sys/time.h>
 
-static volatile sig_atomic_t primesFound = 0;
-pthread_mutex_t mutex = PTHREAD_COND_INITIALIZER;
-
+pthread_mutex_t mutex;
+int nextRegion = 0;
+int done = 0;
 /* Parameters passed to search_region function */
 typedef struct args_1 {
   int end;
@@ -37,24 +37,26 @@ void *search_region(void *arg) {
 
   args = (Args *)arg;
   n = 0;
-  /* Search for primes in given range */
-  for (i = args->start; primesFound < args->limit; i++) {
-    /* Reached end of block */
-    if (n++ == (1 + args->end - args->start)) {
-      n = 0;
-      i += args->block_gap * (args->end - args->start);
+  while (1)
+  {
+    // Get the next chunk
+    pthread_mutex_lock(&mutex);
+    int startRegion = nextRegion;
+    int endRegion = nextRegion += args->block_gap;
+    nextRegion = endRegion;
+    pthread_mutex_unlock(&mutex);
+    if (endRegion > args->limit)
+    {
+      break;
     }
-    if (is_prime(i)) {
-      pthread_mutex_lock(&mutex);
-      /* Notify other threads we are finished */
-      if (primesFound > args->limit)
-        break;
-      /* Insert into bounded buffer */
-      else {
+    printf("%d %d\n", startRegion, endRegion);
+    /* Search for primes in given range */
+    for (i = startRegion; i < endRegion; ++i)
+    {
+      if (is_prime(i))
+      {
         bb_insert(args->bb, i);
-        primesFound++;
       }
-      pthread_mutex_unlock(&mutex);
     }
   }
 
@@ -62,7 +64,8 @@ void *search_region(void *arg) {
 }
 
 /* Prints all elements in bounded buffer */
-void *print_primes(void *arg) {
+void *print_primes(void *arg)
+{
 
   Args_t *args;
   int count;
@@ -70,8 +73,9 @@ void *print_primes(void *arg) {
   args = (Args_t *)arg;
   count = 0;
   while (count++ < args->limit)
+  {
     min_heap_insert(args->mh, bb_remove(args->bb));
-
+  }
   /* Notify other threads we are done */
   set_done(args->bb);
 
@@ -81,7 +85,9 @@ void *print_primes(void *arg) {
 void print_sorted(MinHeap *mh, int limit) {
   int i;
   for (i = 0; i < limit; i++)
+  {
     printf("%d\n", min_heap_delete_root(mh));
+  }
 }
 
 int main(int argc, char **argv) {
@@ -117,7 +123,7 @@ int main(int argc, char **argv) {
     }
     i = j + 1;
   }
-
+  pthread_mutex_init(&mutex, NULL);
   /* Create bounded buffer object */
   bb = bb_create(limit);
   if (!bb)
@@ -193,6 +199,11 @@ int main(int argc, char **argv) {
       free((void *)args1);
       return -1;
     }
+  for (i = 0; i < nthread; ++i)
+  {
+    pthread_join(generatorThreads[i], NULL);
+  }
+  set_done(bb);
 
   /* Wait for collector thread to finish */
   pthread_join(collectorThread, NULL);
